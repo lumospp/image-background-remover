@@ -79,3 +79,4 @@ image-bg-remover/
 ## License
 
 MIT
+# Image Background Remover
