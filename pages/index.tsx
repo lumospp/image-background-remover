@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
+import Head from 'next/head'
 
 type AppState = 'idle' | 'uploading' | 'processing' | 'success' | 'error'
 
@@ -88,6 +89,11 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 antialiased">
+      <Head>
+        <title>AI 智能抠图</title>
+        <meta name="description" content="AI一键去除图片背景" />
+      </Head>
+
       {/* Header */}
       <header className="bg-white border-b border-slate-100/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-2xl mx-auto px-6 py-3.5">
@@ -112,7 +118,6 @@ export default function HomePage() {
           {/* Success State */}
           {state === 'success' && resultUrl && (
             <div className="animate-fade-in-up">
-              {/* Result Header */}
               <div className="text-center mb-5">
                 <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-emerald-50 mb-3">
                   <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -123,7 +128,6 @@ export default function HomePage() {
                 <p className="text-xs text-slate-500 mt-1">背景已去除，可直接下载</p>
               </div>
               
-              {/* Image Comparison */}
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <div className="bg-white rounded-xl p-2.5 shadow-soft">
                   <p className="text-xs text-slate-400 mb-1.5">原图</p>
@@ -139,7 +143,6 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="flex gap-2">
                 <button
                   onClick={handleDownload}
@@ -158,7 +161,6 @@ export default function HomePage() {
                 </button>
               </div>
 
-              {/* Share hint */}
               <div className="mt-3 text-center">
                 <p className="text-xs text-slate-400">PNG透明背景，可直接用于设计</p>
               </div>
@@ -184,7 +186,6 @@ export default function HomePage() {
           {(state === 'idle' || state === 'uploading' || state === 'processing') && (
             <div className="animate-fade-in-up">
               
-              {/* Demo Section */}
               {state === 'idle' && (
                 <div className="mb-5">
                   <p className="text-xs text-slate-400 mb-2 text-center">效果示例</p>
@@ -209,7 +210,6 @@ export default function HomePage() {
                 </div>
               )}
 
-              {/* Upload Area */}
               <div
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDrop}
@@ -264,7 +264,6 @@ export default function HomePage() {
                 )}
               </div>
 
-              {/* Safety & Feature hints */}
               <div className="mt-4 space-y-1.5">
                 <div className="flex items-center justify-center gap-1.5 text-xs text-slate-400">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -284,7 +283,6 @@ export default function HomePage() {
         </div>
       </main>
 
-      {/* Footer */}
       <footer className="py-4 px-6 text-center">
         <p className="text-xs text-slate-300">AI 智能抠图 · 永久免费</p>
       </footer>

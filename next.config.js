@@ -1,12 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  reactStrictMode: true,
+  output: 'export',
+  distDir: 'out',
   images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'api.remove.bg',
-      },
-    ],
+    unoptimized: true,
   },
 }
 

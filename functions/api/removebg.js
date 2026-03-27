@@ -1,12 +1,8 @@
 /**
  * Cloudflare Worker - Remove.bg API Proxy
- * 
- * 设置环境变量:
- * - REMOVE_BG_API_KEY: Remove.bg API Key
  */
 
-export async function onRequest({ request }) {
-  // 只允许 POST
+export async function onRequest({ request, env }) {
   if (request.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
@@ -14,7 +10,7 @@ export async function onRequest({ request }) {
     })
   }
 
-  const apiKey = request.env.REMOVE_BG_API_KEY
+  const apiKey = env.REMOVE_BG_API_KEY
   if (!apiKey) {
     return new Response(JSON.stringify({ error: 'API not configured' }), {
       status: 500,
@@ -33,13 +29,16 @@ export async function onRequest({ request }) {
       })
     }
 
-    // 调用 Remove.bg API
+    const removeBgFormData = new FormData()
+    removeBgFormData.append('image_file', imageFile)
+    removeBgFormData.append('size', 'auto')
+
     const removeBgResponse = await fetch('https://api.remove.bg/v1.0/removebg', {
       method: 'POST',
       headers: {
         'X-Api-Key': apiKey,
       },
-      body: formData,
+      body: removeBgFormData,
     })
 
     if (!removeBgResponse.ok) {
@@ -50,7 +49,6 @@ export async function onRequest({ request }) {
       })
     }
 
-    // 返回图片
     const blob = await removeBgResponse.blob()
     return new Response(blob, {
       status: 200,
