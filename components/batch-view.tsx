@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import React, { useState, useCallback, useRef } from 'react'
 import { Download, Trash2, CheckCircle, XCircle, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -35,7 +35,7 @@ async function removeBackground(file: File): Promise<Blob> {
   return response.blob()
 }
 
-export function BatchView() {
+function BatchViewInner() {
   const [files, setFiles] = useState<BatchFile[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
   const [currentProgress, setCurrentProgress] = useState(0)
@@ -171,6 +171,8 @@ export function BatchView() {
                     src={batchFile.originalUrl}
                     alt={batchFile.file.name}
                     className="w-full h-full object-cover"
+                    loading="lazy"
+                    decoding="async"
                   />
                   {batchFile.status === 'processing' && (
                     <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
@@ -279,6 +281,8 @@ export function BatchView() {
                       src={batchFile.resultUrl}
                       alt={batchFile.file.name}
                       className="w-full h-full object-contain"
+                      loading="lazy"
+                      decoding="async"
                     />
                   ) : batchFile.status === 'error' ? (
                     <div className="w-full h-full flex flex-col items-center justify-center text-red-400 gap-1">
@@ -382,3 +386,6 @@ export function BatchView() {
     </div>
   )
 }
+
+// Memoize to prevent re-renders when parent state changes but files don't
+export const BatchView = React.memo(BatchViewInner)

@@ -1,8 +1,21 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useMemo } from 'react'
 import Head from 'next/head'
-import { ResultView } from '@/components/result-view'
+import dynamic from 'next/dynamic'
+
+// Code splitting: lazy load ResultView (not needed on initial idle state)
+const ResultView = dynamic(
+  () => import('@/components/result-view').then(mod => mod.ResultView),
+  {
+    loading: () => (
+      <div className="flex items-center justify-center py-12">
+        <div className="w-8 h-8 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+      </div>
+    ),
+    ssr: false,
+  }
+)
 
 type AppState = 'idle' | 'uploading' | 'processing' | 'success' | 'error'
 

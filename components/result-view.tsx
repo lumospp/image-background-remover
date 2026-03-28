@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import React, { useState, useCallback, useMemo, useRef } from 'react'
 import { Download, RefreshCw, ArrowLeft, Palette } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { BackgroundPicker } from './background-picker'
 
 interface ResultViewProps {
@@ -18,7 +18,7 @@ interface ResultViewProps {
 type BgType = 'transparent' | 'white' | 'black' | 'custom'
 type CustomColor = string
 
-export function ResultView({
+function ResultViewInner({
   originalUrl,
   resultUrl,
   fileName,
@@ -28,6 +28,12 @@ export function ResultView({
 }: ResultViewProps) {
   const [bgType, setBgType] = useState<BgType>('transparent')
   const [customColor, setCustomColor] = useState<CustomColor>('#3b82f6')
+  
+  // Use refs to avoid stale closures in handleDownload
+  const bgTypeRef = useRef(bgType)
+  const customColorRef = useRef(customColor)
+  bgTypeRef.current = bgType
+  customColorRef.current = customColor
 
   const handleDownload = useCallback(async () => {
     const canvas = document.createElement('canvas')
@@ -46,15 +52,19 @@ export function ResultView({
     canvas.width = img.naturalWidth
     canvas.height = img.naturalHeight
 
+    // Use refs to get current state values
+    const currentBgType = bgTypeRef.current
+    const currentCustomColor = customColorRef.current
+
     // Draw background
-    if (bgType === 'white') {
+    if (currentBgType === 'white') {
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
-    } else if (bgType === 'black') {
+    } else if (currentBgType === 'black') {
       ctx.fillStyle = '#000000'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
-    } else if (bgType === 'custom') {
-      ctx.fillStyle = customColor
+    } else if (currentBgType === 'custom') {
+      ctx.fillStyle = currentCustomColor
       ctx.fillRect(0, 0, canvas.width, canvas.height)
     }
     // 'transparent' → no background drawn (keeps alpha)
@@ -71,18 +81,40 @@ export function ResultView({
       link.click()
       setTimeout(() => URL.revokeObjectURL(url), 5000)
     }, 'image/png')
-  }, [resultUrl, bgType, customColor])
+  }, [resultUrl])
 
-  // Compose the final display image with background
-  const displayResult = bgType === 'transparent' ? resultUrl : resultUrl
-
-  const bgStyle = () => {
-    if (bgType === 'transparent') return undefined
+  // Memoize background class to avoid recalc on every render
+  const bgContainerClass = useMemo(() => {
+    if (bgType === 'transparent') return 'checkerboard'
     if (bgType === 'white') return 'bg-white'
     if (bgType === 'black') return 'bg-black'
-    if (bgType === 'custom') return `bg-[${customColor}]`
+    return ''
+  }, [bgType])
+
+  const bgStyle = useMemo(() => {
+    if (bgType === 'custom') return { backgroundColor: customColor }
     return undefined
-  }
+  }, [bgType, customColor])
+
+  const handleTabChange = useCallback((v: string) => {
+    setBgType(v as BgType)
+  }, [])
+
+  const handleBgChange = useCallback((value: BgType) => {
+    setBgType(value)
+  }, [])
+
+  const handleCustomColorChange = useCallback((color: string) => {
+    setCustomColor(color)
+  }, [])
+
+  const handleReset = useCallback(() => {
+    if (isBatch && onBatchReset) {
+      onBatchReset()
+    } else {
+      onReset()
+    }
+  }, [isBatch, onReset, onBatchReset])
 
   return (
     <div className="w-full animate-fade-in">
@@ -91,7 +123,7 @@ export function ResultView({
         <Button
           variant="ghost"
           size="sm"
-          onClick={isBatch ? onBatchReset : onReset}
+          onClick={handleReset}
           className="text-white hover:text-white hover:bg-white/20"
         >
           <ArrowLeft size={16} className="mr-2" />
@@ -114,6 +146,8 @@ export function ResultView({
               src={originalUrl}
               alt="Original"
               className="w-full h-auto"
+              loading="lazy"
+              decoding="async"
             />
           </div>
         </div>
@@ -122,33 +156,23 @@ export function ResultView({
         <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-white/60 text-sm font-medium">结果</h3>
-            <Tabs defaultValue="transparent" className="w-auto" onValueChange={(v) => setBgType(v as BgType)}>
-              <TabsList className="bg-white/10 h-8">
-                <TabsTrigger value="transparent" className="text-xs px-2 py-1 h-7 data-[state=active]:bg-white/20">
-                  <Palette size={12} className="mr-1" />
-                  背景
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/10">
+              <Palette size={12} className="text-white/50 mr-1" />
+              <span className="text-xs text-white/70">背景</span>
+            </div>
           </div>
 
           <div
-            className={`relative rounded-xl overflow-hidden ${
-              bgType === 'transparent'
-                ? 'checkerboard'
-                : bgType === 'white'
-                ? 'bg-white'
-                : bgType === 'black'
-                ? 'bg-black'
-                : ''
-            }`}
-            style={bgType === 'custom' ? { backgroundColor: customColor } : undefined}
+            className={`relative rounded-xl overflow-hidden ${bgContainerClass}`}
+            style={bgStyle}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={resultUrl}
               alt="Result"
               className="w-full h-auto relative z-10"
+              loading="lazy"
+              decoding="async"
             />
           </div>
 
@@ -157,8 +181,8 @@ export function ResultView({
             <BackgroundPicker
               value={bgType}
               customColor={customColor}
-              onChange={setBgType}
-              onCustomColorChange={setCustomColor}
+              onChange={handleBgChange}
+              onCustomColorChange={handleCustomColorChange}
             />
           </div>
         </div>
@@ -175,7 +199,7 @@ export function ResultView({
         </Button>
         <Button
           variant="outline"
-          onClick={isBatch ? onBatchReset : onReset}
+          onClick={handleReset}
           className="border-white/30 text-white hover:bg-white/10 hover:text-white"
         >
           <RefreshCw size={18} className="mr-2" />
@@ -185,3 +209,7 @@ export function ResultView({
     </div>
   )
 }
+
+// Wrap with React.memo to prevent re-renders when parent re-renders
+// but props don't actually change (ResultView is loaded dynamically anyway)
+export const ResultView = React.memo(ResultViewInner)
