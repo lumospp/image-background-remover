@@ -29,12 +29,49 @@ export function ResultView({
   const [bgType, setBgType] = useState<BgType>('transparent')
   const [customColor, setCustomColor] = useState<CustomColor>('#3b82f6')
 
-  const handleDownload = useCallback(() => {
-    const link = document.createElement('a')
-    link.href = resultUrl
-    link.download = `removed-background-${Date.now()}.png`
-    link.click()
-  }, [resultUrl])
+  const handleDownload = useCallback(async () => {
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const img = new window.Image()
+    img.crossOrigin = 'anonymous'
+
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve()
+      img.onerror = reject
+      img.src = resultUrl
+    })
+
+    canvas.width = img.naturalWidth
+    canvas.height = img.naturalHeight
+
+    // Draw background
+    if (bgType === 'white') {
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+    } else if (bgType === 'black') {
+      ctx.fillStyle = '#000000'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+    } else if (bgType === 'custom') {
+      ctx.fillStyle = customColor
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+    }
+    // 'transparent' → no background drawn (keeps alpha)
+
+    // Draw result image on top
+    ctx.drawImage(img, 0, 0)
+
+    canvas.toBlob((blob) => {
+      if (!blob) return
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `removed-background-${Date.now()}.png`
+      link.click()
+      setTimeout(() => URL.revokeObjectURL(url), 5000)
+    }, 'image/png')
+  }, [resultUrl, bgType, customColor])
 
   // Compose the final display image with background
   const displayResult = bgType === 'transparent' ? resultUrl : resultUrl

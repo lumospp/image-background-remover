@@ -39,8 +39,9 @@ export function SceneCategory({ selected, onChange }) {
  * - Drag & drop or click to select
  * - Animated icon feedback on drag
  * - Disabled state when quota exhausted or processing
+ * - Supports multiple file selection for batch processing
  */
-export default function DropZone({ onFileSelect, disabled, category, onCategoryChange }) {
+export default function DropZone({ onFileSelect, onFilesSelect, disabled, category, onCategoryChange, multiple, remaining }) {
   const [isDragging, setIsDragging] = useState(false)
   const inputRef = useRef(null)
 
@@ -49,11 +50,18 @@ export default function DropZone({ onFileSelect, disabled, category, onCategoryC
     setIsDragging(false)
     if (disabled) return
 
-    const file = e.dataTransfer.files[0]
-    if (file && file.type.startsWith('image/')) {
-      onFileSelect(file)
+    if (multiple) {
+      const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'))
+      if (files.length > 0) {
+        onFilesSelect(files)
+      }
+    } else {
+      const file = e.dataTransfer.files[0]
+      if (file && file.type.startsWith('image/')) {
+        onFileSelect(file)
+      }
     }
-  }, [onFileSelect, disabled])
+  }, [onFileSelect, onFilesSelect, disabled, multiple])
 
   const handleClick = () => {
     if (disabled) return
@@ -61,8 +69,13 @@ export default function DropZone({ onFileSelect, disabled, category, onCategoryC
   }
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0]
-    if (file) onFileSelect(file)
+    if (multiple) {
+      const files = Array.from(e.target.files)
+      if (files.length > 0) onFilesSelect(files)
+    } else {
+      const file = e.target.files[0]
+      if (file) onFileSelect(file)
+    }
   }
 
   return (
@@ -71,11 +84,12 @@ export default function DropZone({ onFileSelect, disabled, category, onCategoryC
       onDragLeave={() => setIsDragging(false)}
       onDrop={handleDrop}
       onClick={handleClick}
+      touch-action="manipulation"
       className={`
         relative flex flex-col items-center justify-center
-        min-h-screen -m-8 px-6 cursor-pointer
-        transition-all duration-300
-        ${disabled ? 'opacity-60 cursor-not-allowed' : 'hover:opacity-95'}
+        min-h-screen -m-8 px-4 sm:px-6 cursor-pointer
+        transition-all duration-300 select-none
+        ${disabled ? 'opacity-60 cursor-not-allowed' : 'hover:opacity-95 active:scale-[0.98]'}
       `}
     >
       {/* Subtle radial glow behind content */}
@@ -86,10 +100,10 @@ export default function DropZone({ onFileSelect, disabled, category, onCategoryC
         `} />
       </div>
 
-      {/* Main card content */}
+      {/* Main card content — mobile responsive */}
       <div className={`
-        relative z-10 flex flex-col items-center gap-6
-        border-2 border-dashed rounded-3xl p-16 w-full max-w-2xl
+        relative z-10 flex flex-col items-center gap-4 sm:gap-6
+        border-2 border-dashed rounded-3xl p-8 sm:p-12 md:p-16 w-full max-w-2xl
         transition-all duration-300
         ${isDragging
           ? 'border-white bg-white/15 scale-[1.02]'
@@ -99,30 +113,34 @@ export default function DropZone({ onFileSelect, disabled, category, onCategoryC
       `}>
         {/* Animated icon */}
         <div className={`
-          w-24 h-24 rounded-2xl flex items-center justify-center
+          w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-2xl flex items-center justify-center
           bg-white/10 backdrop-blur-sm
           transition-all duration-300
           ${isDragging ? 'scale-110 bg-white/20' : ''}
         `}>
           {isDragging ? (
-            <ImageIcon size={48} className="text-white animate-bounce" />
+            <ImageIcon size={36} className="sm:text-4xl md:text-5xl text-white animate-bounce" />
           ) : (
-            <Upload size={48} className="text-white/80" />
+            <Upload size={36} className="sm:text-4xl md:text-5xl text-white/80" />
           )}
         </div>
 
         {/* Heading — C1 copy applied */}
-        <div className="text-center space-y-2">
-          <h2 className="text-3xl font-bold text-white">
+        <div className="text-center space-y-2 px-2">
+          <h2 className="text-2xl sm:text-3xl font-bold text-white">
             {isDragging
-              ? 'Release to remove background'
-              : 'Drop your product image here'
+              ? 'Release to add images'
+              : multiple
+                ? 'Drop your images here for batch processing'
+                : 'Drop your product image here'
             }
           </h2>
-          <p className="text-white/60 text-lg">
+          <p className="text-white/60 text-base sm:text-lg">
             {isDragging
               ? '...'
-              : 'Takes about 5 seconds · No account required'
+              : multiple
+                ? `Select multiple images · ${remaining > 0 ? `${remaining} free credits` : 'No credits left'}`
+                : 'Takes about 5 seconds · No account required'
             }
           </p>
         </div>
@@ -132,11 +150,13 @@ export default function DropZone({ onFileSelect, disabled, category, onCategoryC
           <SceneCategory selected={category} onChange={onCategoryChange} />
         </div>
 
-        {/* Hidden file input */}
+        {/* Hidden file input — mobile optimized with capture for camera */}
         <input
           ref={inputRef}
           type="file"
           accept="image/*"
+          multiple={multiple}
+          capture="environment"
           onChange={handleFileChange}
           className="hidden"
         />

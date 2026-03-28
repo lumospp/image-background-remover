@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react'
 import Head from 'next/head'
+import { ResultView } from '@/components/result-view'
 
 type AppState = 'idle' | 'uploading' | 'processing' | 'success' | 'error'
 
@@ -142,52 +143,12 @@ export default function HomePage() {
             </div>
 
             {/* Success State */}
-            {state === 'success' && resultUrl && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-6 mb-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                      <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    <span className="text-sm font-medium text-emerald-400">Background Removed Successfully!</span>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4 mb-5">
-                    <div>
-                      <p className="text-xs text-white/40 mb-2">Original</p>
-                      <div className="rounded-xl overflow-hidden border border-white/10">
-                        <img src={originalUrl!} alt="Original" className="w-full" />
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-xs text-white/40 mb-2">Result</p>
-                      <div className="rounded-xl overflow-hidden border border-white/10 checkerboard">
-                        <img src={resultUrl!} alt="Result" className="w-full" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-3">
-                    <button
-                      onClick={handleDownload}
-                      className="flex-1 inline-flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white py-3 px-5 rounded-xl font-medium transition-all text-sm shadow-lg shadow-indigo-500/25"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                      Download PNG
-                    </button>
-                    <button
-                      onClick={handleReset}
-                      className="px-5 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl font-medium transition-all text-sm text-white/70"
-                    >
-                      Try Another
-                    </button>
-                  </div>
-                </div>
-              </div>
+            {state === 'success' && resultUrl && originalUrl && (
+              <ResultView
+                originalUrl={originalUrl}
+                resultUrl={resultUrl}
+                onReset={handleReset}
+              />
             )}
 
             {/* Error State */}

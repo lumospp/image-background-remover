@@ -1,0 +1,9 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://bgremover.tools/sitemap.xml
+
+# Crawl-delay (optional, be nice to small servers)
+Crawl-delay: 1
