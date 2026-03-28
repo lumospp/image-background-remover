@@ -1,5 +1,13 @@
-import { Download, RefreshCw } from 'lucide-react'
+import { Download, RefreshCw, Sparkles } from 'lucide-react'
+import { BeforeAfterSlider } from './BeforeAfterSlider'
 
+/**
+ * Result — displays the processed image with Before/After slider comparison.
+ * Updated per R2 competitive analysis:
+ * - Before/After slider replaces side-by-side grid (main interaction mode)
+ * - Prominent CTA messaging
+ * - Clean, minimal action bar
+ */
 export default function Result({ originalUrl, resultUrl, onReset }) {
   const handleDownload = () => {
     const link = document.createElement('a')
@@ -9,60 +17,48 @@ export default function Result({ originalUrl, resultUrl, onReset }) {
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
-      <div className="grid md:grid-cols-2 gap-8">
-        {/* Original */}
-        <div className="bg-white/10 rounded-2xl p-4">
-          <h3 className="text-white/70 text-sm mb-2 font-medium">原图</h3>
-          <div className="relative rounded-xl overflow-hidden bg-white/5">
-            <img
-              src={originalUrl}
-              alt="Original"
-              className="w-full h-auto"
-            />
-          </div>
-        </div>
-
-        {/* Result */}
-        <div className="bg-white/10 rounded-2xl p-4">
-          <h3 className="text-white/70 text-sm mb-2 font-medium">结果</h3>
-          <div className="relative rounded-xl overflow-hidden bg-white/5">
-            {/* biome-ignore lint/nursery/noImgElement: result image from API */}
-            <img
-              src={resultUrl}
-              alt="Result"
-              className="w-full h-auto"
-            />
-            {/* Checkerboard pattern to show transparency */}
-            <div 
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                backgroundImage: 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)',
-                backgroundSize: '16px 16px',
-                backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px',
-                opacity: 0.3
-              }}
-            />
-          </div>
+    <div className="min-h-screen -m-8 flex flex-col">
+      {/* Full-screen Before/After comparison */}
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="w-full max-w-5xl">
+          {/* Before/After slider — hero interaction */}
+          <BeforeAfterSlider
+            originalUrl={originalUrl}
+            resultUrl={resultUrl}
+          />
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="flex justify-center gap-4 mt-8">
-        <button
-          onClick={handleDownload}
-          className="flex items-center gap-2 bg-white text-purple-600 px-6 py-3 rounded-xl font-semibold hover:bg-white/90 transition"
-        >
-          <Download size={20} />
-          下载结果
-        </button>
-        <button
-          onClick={onReset}
-          className="flex items-center gap-2 bg-white/20 text-white px-6 py-3 rounded-xl font-semibold hover:bg-white/30 transition"
-        >
-          <RefreshCw size={20} />
-          处理另一张
-        </button>
+      {/* Bottom action bar — minimal, non-distracting */}
+      <div className="py-6 px-8 flex items-center justify-between gap-4 flex-wrap">
+        {/* Left: status hint */}
+        <div className="flex items-center gap-2 text-white/50 text-sm">
+          <Sparkles size={16} className="text-yellow-300" />
+          <span>Background removed successfully! Transparent PNG ready.</span>
+        </div>
+
+        {/* Right: action buttons — C1 copy applied */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onReset}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl
+              bg-white/10 text-white border border-white/20
+              font-medium text-sm hover:bg-white/20 transition-all duration-200"
+          >
+            <RefreshCw size={16} />
+            Remove Background from Another
+          </button>
+
+          <button
+            onClick={handleDownload}
+            className="flex items-center gap-2 px-6 py-2.5 rounded-xl
+              bg-white text-purple-700 font-semibold text-sm
+              hover:bg-white/90 transition-all duration-200 shadow-lg hover:shadow-xl"
+          >
+            <Download size={16} />
+            Download Transparent PNG
+          </button>
+        </div>
       </div>
     </div>
   )

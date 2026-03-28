@@ -1,8 +1,48 @@
-import { useCallback, useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { Upload, Image as ImageIcon } from 'lucide-react'
 
-export default function DropZone({ onFileSelect, disabled }) {
+/**
+ * SceneCategory component — lets user pick an image category before uploading.
+ * Category is stored in parent state but does NOT affect API call (Remove.bg handles it internally).
+ */
+export function SceneCategory({ selected, onChange }) {
+  const categories = [
+    { id: 'people', label: 'People' },
+    { id: 'product', label: 'Product' },
+    { id: 'car', label: 'Car' },
+    { id: 'animals', label: 'Animals' },
+  ]
+
+  return (
+    <div className="flex flex-wrap justify-center gap-2 mb-8">
+      {categories.map((cat) => (
+        <button
+          key={cat.id}
+          onClick={() => onChange(cat.id)}
+          className={`
+            px-4 py-1.5 rounded-full text-sm font-medium border transition-all duration-200
+            ${selected === cat.id
+              ? 'bg-white text-purple-700 border-white shadow-md'
+              : 'bg-white/10 text-white border-white/30 hover:bg-white/20'
+            }
+          `}
+        >
+          {cat.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * DropZone — full-viewport hero upload zone.
+ * - Drag & drop or click to select
+ * - Animated icon feedback on drag
+ * - Disabled state when quota exhausted or processing
+ */
+export default function DropZone({ onFileSelect, disabled, category, onCategoryChange }) {
   const [isDragging, setIsDragging] = useState(false)
+  const inputRef = useRef(null)
 
   const handleDrop = useCallback((e) => {
     e.preventDefault()
@@ -17,14 +57,12 @@ export default function DropZone({ onFileSelect, disabled }) {
 
   const handleClick = () => {
     if (disabled) return
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = 'image/*'
-    input.onchange = (e) => {
-      const file = e.target.files[0]
-      if (file) onFileSelect(file)
-    }
-    input.click()
+    inputRef.current?.click()
+  }
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0]
+    if (file) onFileSelect(file)
   }
 
   return (
@@ -34,25 +72,80 @@ export default function DropZone({ onFileSelect, disabled }) {
       onDrop={handleDrop}
       onClick={handleClick}
       className={`
-        border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer
-        transition-all duration-200
-        ${isDragging ? 'border-white bg-white/20' : 'border-white/50 bg-white/10'}
-        ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/20'}
+        relative flex flex-col items-center justify-center
+        min-h-screen -m-8 px-6 cursor-pointer
+        transition-all duration-300
+        ${disabled ? 'opacity-60 cursor-not-allowed' : 'hover:opacity-95'}
       `}
     >
-      <div className="flex flex-col items-center gap-4 text-white">
-        {isDragging ? (
-          <ImageIcon size={64} className="animate-bounce" />
-        ) : (
-          <Upload size={64} />
-        )}
-        <div>
-          <p className="text-xl font-semibold">
-            {isDragging ? '释放图片' : '拖拽图片到这里'}
-          </p>
-          <p className="text-white/70 mt-2">或点击选择文件</p>
-        </div>
+      {/* Subtle radial glow behind content */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className={`
+          w-96 h-96 rounded-full blur-3xl transition-all duration-500
+          ${isDragging ? 'bg-white/30 scale-110' : 'bg-white/10 scale-100'}
+        `} />
       </div>
+
+      {/* Main card content */}
+      <div className={`
+        relative z-10 flex flex-col items-center gap-6
+        border-2 border-dashed rounded-3xl p-16 w-full max-w-2xl
+        transition-all duration-300
+        ${isDragging
+          ? 'border-white bg-white/15 scale-[1.02]'
+          : 'border-white/40 bg-white/5 hover:border-white/70 hover:bg-white/10'
+        }
+        ${disabled ? 'cursor-not-allowed' : ''}
+      `}>
+        {/* Animated icon */}
+        <div className={`
+          w-24 h-24 rounded-2xl flex items-center justify-center
+          bg-white/10 backdrop-blur-sm
+          transition-all duration-300
+          ${isDragging ? 'scale-110 bg-white/20' : ''}
+        `}>
+          {isDragging ? (
+            <ImageIcon size={48} className="text-white animate-bounce" />
+          ) : (
+            <Upload size={48} className="text-white/80" />
+          )}
+        </div>
+
+        {/* Heading — C1 copy applied */}
+        <div className="text-center space-y-2">
+          <h2 className="text-3xl font-bold text-white">
+            {isDragging
+              ? 'Release to remove background'
+              : 'Drop your product image here'
+            }
+          </h2>
+          <p className="text-white/60 text-lg">
+            {isDragging
+              ? '...'
+              : 'Takes about 5 seconds · No account required'
+            }
+          </p>
+        </div>
+
+        {/* Scene category pills */}
+        <div className="pt-2">
+          <SceneCategory selected={category} onChange={onCategoryChange} />
+        </div>
+
+        {/* Hidden file input */}
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+      </div>
+
+      {/* File format hint */}
+      <p className="relative z-10 mt-4 text-white/40 text-sm">
+        Supports JPG, PNG, WebP · Max 10MB
+      </p>
     </div>
   )
 }
