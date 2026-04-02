@@ -3,7 +3,6 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react'
 import { Download, RefreshCw, ArrowLeft, Palette } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { BackgroundPicker } from './background-picker'
 
 interface ResultViewProps {
@@ -28,7 +27,7 @@ function ResultViewInner({
 }: ResultViewProps) {
   const [bgType, setBgType] = useState<BgType>('transparent')
   const [customColor, setCustomColor] = useState<CustomColor>('#3b82f6')
-  
+
   // Use refs to avoid stale closures in handleDownload
   const bgTypeRef = useRef(bgType)
   const customColorRef = useRef(customColor)
@@ -96,10 +95,6 @@ function ResultViewInner({
     return undefined
   }, [bgType, customColor])
 
-  const handleTabChange = useCallback((v: string) => {
-    setBgType(v as BgType)
-  }, [])
-
   const handleBgChange = useCallback((value: BgType) => {
     setBgType(value)
   }, [])
@@ -120,28 +115,25 @@ function ResultViewInner({
     <div className="w-full animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <Button
-          variant="ghost"
-          size="sm"
+        <button
           onClick={handleReset}
-          className="text-white hover:text-white hover:bg-white/20"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
         >
-          <ArrowLeft size={16} className="mr-2" />
-          {isBatch ? '返回批量处理' : '处理新图片'}
-        </Button>
+          <ArrowLeft size={16} />
+          {isBatch ? 'Back to batch' : 'Process new image'}
+        </button>
 
         {fileName && (
-          <p className="text-white/60 text-sm truncate max-w-xs">{fileName}</p>
+          <p className="text-gray-500 text-sm truncate max-w-xs">{fileName}</p>
         )}
       </div>
 
       {/* Image Comparison */}
       <div className="grid md:grid-cols-2 gap-6">
         {/* Original */}
-        <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
-          <h3 className="text-white/60 text-sm mb-3 font-medium">原图</h3>
-          <div className="relative rounded-xl overflow-hidden bg-white/5">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
+        <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
+          <h3 className="text-gray-500 text-sm mb-3 font-medium">Original</h3>
+          <div className="relative rounded-xl overflow-hidden bg-gray-100">
             <img
               src={originalUrl}
               alt="Original"
@@ -153,12 +145,12 @@ function ResultViewInner({
         </div>
 
         {/* Result with Background Options */}
-        <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
+        <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-white/60 text-sm font-medium">结果</h3>
-            <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/10">
-              <Palette size={12} className="text-white/50 mr-1" />
-              <span className="text-xs text-white/70">背景</span>
+            <h3 className="text-gray-500 text-sm font-medium">Result</h3>
+            <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-gray-100">
+              <Palette size={12} className="text-gray-400 mr-1" />
+              <span className="text-xs text-gray-600">Background</span>
             </div>
           </div>
 
@@ -166,7 +158,6 @@ function ResultViewInner({
             className={`relative rounded-xl overflow-hidden ${bgContainerClass}`}
             style={bgStyle}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={resultUrl}
               alt="Result"
@@ -190,21 +181,20 @@ function ResultViewInner({
 
       {/* Actions */}
       <div className="flex flex-wrap justify-center gap-3 mt-8">
-        <Button
+        <button
           onClick={handleDownload}
-          className="bg-purple-500 hover:bg-purple-600 text-white"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl transition-colors shadow-lg shadow-indigo-500/20"
         >
-          <Download size={18} className="mr-2" />
-          下载 PNG
-        </Button>
-        <Button
-          variant="outline"
+          <Download size={18} />
+          Download PNG
+        </button>
+        <button
           onClick={handleReset}
-          className="border-white/30 text-white hover:bg-white/10 hover:text-white"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors border border-gray-200"
         >
-          <RefreshCw size={18} className="mr-2" />
-          {isBatch ? '继续批量处理' : '处理另一张'}
-        </Button>
+          <RefreshCw size={18} />
+          {isBatch ? 'Continue batch' : 'Process another'}
+        </button>
       </div>
     </div>
   )

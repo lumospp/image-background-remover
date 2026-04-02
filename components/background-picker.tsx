@@ -6,14 +6,14 @@ import { Check } from 'lucide-react'
 type BgType = 'transparent' | 'white' | 'black' | 'custom'
 
 const PRESET_COLORS = [
-  { name: '透明', value: 'transparent', pattern: 'checkerboard' },
-  { name: '白色', value: 'white', bg: 'bg-white' },
-  { name: '黑色', value: 'black', bg: 'bg-black' },
-  { name: '红色', value: 'custom', color: '#ef4444' },
-  { name: '蓝色', value: 'custom', color: '#3b82f6' },
-  { name: '绿色', value: 'custom', color: '#22c55e' },
-  { name: '黄色', value: 'custom', color: '#eab308' },
-  { name: '紫色', value: 'custom', color: '#a855f7' },
+  { name: 'Transparent', value: 'transparent', pattern: 'checkerboard' },
+  { name: 'White', value: 'white', bg: 'bg-white' },
+  { name: 'Black', value: 'black', bg: 'bg-black' },
+  { name: 'Red', value: 'custom', color: '#ef4444' },
+  { name: 'Blue', value: 'custom', color: '#3b82f6' },
+  { name: 'Green', value: 'custom', color: '#22c55e' },
+  { name: 'Yellow', value: 'custom', color: '#eab308' },
+  { name: 'Purple', value: 'custom', color: '#a855f7' },
 ]
 
 interface BackgroundPickerProps {
@@ -42,10 +42,10 @@ export function BackgroundPicker({
               }
             }}
             className={cn(
-              'relative w-8 h-8 rounded-lg border-2 border-white/20 transition-all hover:scale-110',
+              'relative w-8 h-8 rounded-lg border-2 border-gray-200 transition-all hover:scale-110',
               preset.pattern === 'checkerboard' && 'checkerboard',
               preset.bg,
-              value === preset.value && preset.value !== 'custom' && 'ring-2 ring-purple-400 ring-offset-2 ring-offset-background'
+              value === preset.value && preset.value !== 'custom' && 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-white'
             )}
             style={
               preset.color
@@ -77,12 +77,12 @@ export function BackgroundPicker({
               onChange('custom')
               onCustomColorChange(e.target.value)
             }}
-            className="w-8 h-8 rounded-lg border-2 border-white/20 cursor-pointer p-0 bg-transparent"
-            title="自定义颜色"
+            className="w-8 h-8 rounded-lg border-2 border-gray-200 cursor-pointer p-0 bg-transparent"
+            title="Custom color"
           />
           {value === 'custom' && (
             <div
-              className="absolute inset-0 rounded-lg ring-2 ring-purple-400 ring-offset-2 ring-offset-background pointer-events-none"
+              className="absolute inset-0 rounded-lg ring-2 ring-indigo-500 ring-offset-2 ring-offset-white pointer-events-none"
               style={{ backgroundColor: 'transparent' }}
             />
           )}
@@ -91,7 +91,7 @@ export function BackgroundPicker({
 
       {value === 'custom' && (
         <div className="flex items-center gap-2">
-          <span className="text-white/60 text-xs">自定义颜色:</span>
+          <span className="text-gray-500 text-xs">Custom color:</span>
           <input
             type="text"
             value={customColor}
@@ -99,11 +99,11 @@ export function BackgroundPicker({
               onChange('custom')
               onCustomColorChange(e.target.value)
             }}
-            className="bg-white/10 border border-white/20 rounded px-2 py-1 text-white text-xs w-24 focus:outline-none focus:ring-1 focus:ring-purple-400"
+            className="bg-gray-50 border border-gray-200 rounded px-2 py-1 text-gray-700 text-xs w-24 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             placeholder="#000000"
           />
           <div
-            className="w-6 h-6 rounded border border-white/20"
+            className="w-6 h-6 rounded border border-gray-200"
             style={{ backgroundColor: customColor }}
           />
         </div>
