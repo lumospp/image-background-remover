@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
-import { useAuth, SignIn } from '@clerk/clerk-react'
-import { Scissors, AlertCircle, Zap, Layers, ArrowLeft, User } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Scissors, AlertCircle, Zap, Layers, ArrowLeft, User, Loader2 } from 'lucide-react'
 import DropZone from './components/DropZone'
 import Result from './components/Result'
 import BatchQueue from './components/BatchQueue'
@@ -8,11 +7,81 @@ import { removeBackground } from './lib/api'
 import JSZip from 'jszip'
 
 const FREE_QUOTA = 50
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
+
+/**
+ * Load Google Identity Services script
+ */
+function loadGISScript() {
+  return new Promise((resolve, reject) => {
+    if (window.google) {
+      resolve()
+      return
+    }
+    const script = document.createElement('script')
+    script.src = 'https://accounts.google.com/gsi/client'
+    script.async = true
+    script.defer = true
+    script.onload = resolve
+    script.onerror = reject
+    document.head.appendChild(script)
+  })
+}
 
 /**
  * LoginScreen - Shows Google sign-in button
  */
-function LoginScreen() {
+function LoginScreen({ onLogin }) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const buttonRef = useRef(null)
+
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID) {
+      setError('Google Client ID not configured')
+      return
+    }
+
+    loadGISScript()
+      .then(() => {
+        if (window.google && buttonRef.current) {
+          window.google.accounts.id.renderButton(buttonRef.current, {
+            type: 'standard',
+            theme: 'filled_black',
+            size: 'large',
+            text: 'signin_with',
+            shape: 'rectangular',
+            logo_alignment: 'left',
+            width: 250,
+          })
+
+          // Also initialize the library for prompt moment
+          window.google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+            callback: async (response) => {
+              if (response.credential) {
+                setLoading(true)
+                try {
+                  await onLogin(response.credential)
+                } catch (err) {
+                  setError(err.message)
+                  setLoading(false)
+              }
+            },
+          })
+        }
+      })
+      .catch(() => {
+        setError('Failed to load Google Sign-In')
+      })
+  }, [onLogin])
+
+  const handleLogin = () => {
+    if (window.google) {
+      window.google.accounts.id.prompt()
+    }
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
       <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 text-center">
@@ -28,12 +97,22 @@ function LoginScreen() {
           Sign in to continue removing backgrounds from your images
         </p>
         
-        <SignIn
-          routing="path"
-          path="/sign-in"
-          signUpUrl="/sign-up"
-          afterSignInUrl="/"
-        />
+        {error ? (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 text-red-600 text-sm">
+            {error}
+          </div>
+        ) : (
+          <div className="flex justify-center mb-6">
+            <div ref={buttonRef} onClick={handleLogin} className="cursor-pointer inline-block" />
+          </div>
+        )}
+
+        {loading && (
+          <div className="flex items-center justify-center gap-2 text-gray-500">
+            <Loader2 size={20} className="animate-spin" />
+            <span>Signing in...</span>
+          </div>
+        )}
         
         <p className="text-xs text-gray-400 mt-6">
           By signing in, you agree to our Terms of Service and Privacy Policy
@@ -44,15 +123,19 @@ function LoginScreen() {
 }
 
 /**
- * UserButton - Shows when user is signed in
+ * UserBadge - Shows when user is signed in
  */
-function UserBadge({ userId, onSignOut }) {
+function UserBadge({ user, onSignOut }) {
   return (
     <div className="flex items-center gap-3">
-      <div className="flex items-center gap-2 px-3 py-1.5 bg-white/20 rounded-full text-white text-sm">
-        <User size={14} />
-        <span className="max-w-[100px] truncate">{userId.slice(0, 8)}...</span>
-      </div>
+      {user.picture ? (
+        <img src={user.picture} alt={user.name} className="w-8 h-8 rounded-full" />
+      ) : (
+        <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+          <User size={16} className="text-white" />
+        </div>
+      )}
+      <span className="text-white text-sm font-medium hidden sm:inline">{user.name}</span>
       <button
         onClick={onSignOut}
         className="text-white/60 hover:text-white text-sm transition-colors"
@@ -64,7 +147,8 @@ function UserBadge({ userId, onSignOut }) {
 }
 
 export default function App() {
-  const { isSignedIn, userId, signOut } = useAuth()
+  const [user, setUser] = useState(null)
+  const [credential, setCredential] = useState(null)
   const [file, setFile] = useState(null)
   const [originalUrl, setOriginalUrl] = useState(null)
   const [resultUrl, setResultUrl] = useState(null)
@@ -84,17 +168,83 @@ export default function App() {
   // Generate unique ID
   const generateId = () => `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
+  // Handle Google login
+  const handleLogin = useCallback(async (googleCredential) => {
+    try {
+      const response = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: googleCredential }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Login failed')
+      }
+
+      const data = await response.json()
+      if (data.success && data.user) {
+        setUser(data.user)
+        setCredential(googleCredential)
+        setUsageCount(data.user.usageCount || 0)
+      }
+    } catch (err) {
+      throw new Error('Failed to authenticate with server')
+    }
+  }, [])
+
   // Handle sign out
-  const handleSignOut = async () => {
-    await signOut()
-    window.location.href = '/'
+  const handleSignOut = () => {
+    setUser(null)
+    setCredential(null)
+    setUsageCount(0)
+    if (window.google) {
+      window.google.accounts.id.disableAutoSelect()
+    }
   }
+
+  // Load Google script on mount
+  useEffect(() => {
+    loadGISScript().then(() => {
+      if (window.google) {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: () => {}, // Will be handled by button
+        })
+      }
+    })
+  }, [])
 
   // ============================================================
   // AUTH GATE — Show login if not signed in
   // ============================================================
-  if (!isSignedIn) {
-    return <LoginScreen />
+  if (!user) {
+    return <LoginScreen onLogin={handleLogin} />
+  }
+
+  /**
+   * removeBackground - calls API with optional auth token
+   */
+  const callRemoveBackground = async (file) => {
+    const formData = new FormData()
+    formData.append('image', file)
+
+    const headers = {}
+    if (credential) {
+      headers['Authorization'] = `Bearer ${credential}`
+    }
+
+    const response = await fetch('/api/removebg', {
+      method: 'POST',
+      headers,
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Request failed' }))
+      throw new Error(errorData.error || 'Failed to remove background')
+    }
+
+    return response.blob()
   }
 
   /**
@@ -108,10 +258,10 @@ export default function App() {
     setLoading(true)
 
     try {
-      const blob = await removeBackground(selectedFile)
+      const blob = await callRemoveBackground(selectedFile)
       const url = URL.createObjectURL(blob)
       setResultUrl(url)
-      setUsageCount((c) => c + 1)
+      setUsageCount(c => c + 1)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -123,13 +273,12 @@ export default function App() {
    * handleFilesSelect — handles multiple file selection for batch processing
    */
   const handleFilesSelect = async (files) => {
-    // Create batch items with initial state
     const items = files.map(file => ({
       id: generateId(),
       file,
       previewUrl: URL.createObjectURL(file),
       resultUrl: null,
-      status: 'pending', // pending, processing, completed, error
+      status: 'pending',
       error: null
     }))
 
@@ -138,7 +287,6 @@ export default function App() {
     setSelectedBatchIndex(0)
     setProcessingIndex(0)
 
-    // Start processing the first image
     processBatchItem(0, items)
   }
 
@@ -147,14 +295,12 @@ export default function App() {
    */
   const processBatchItem = async (index, items = batchItems) => {
     if (index >= items.length) {
-      // All items processed
       setProcessingIndex(-1)
       return
     }
 
     const item = items[index]
     
-    // Update status to processing
     setBatchItems(prev => {
       const updated = [...prev]
       updated[index] = { ...updated[index], status: 'processing' }
@@ -162,7 +308,7 @@ export default function App() {
     })
 
     try {
-      const blob = await removeBackground(item.file)
+      const blob = await callRemoveBackground(item.file)
       const resultUrl = URL.createObjectURL(blob)
       
       setBatchItems(prev => {
@@ -177,7 +323,6 @@ export default function App() {
 
       setUsageCount(c => c + 1)
       
-      // Process next item after a short delay
       setTimeout(() => {
         processNextItem(index + 1)
       }, 500)
@@ -192,7 +337,6 @@ export default function App() {
         return updated
       })
       
-      // Continue with next item
       setTimeout(() => {
         processNextItem(index + 1)
       }, 500)
@@ -228,8 +372,7 @@ export default function App() {
 
     const zip = new JSZip()
     
-    // Add each image to the zip
-    const promises = completedItems.map(async (item, index) => {
+    const promises = completedItems.map(async (item) => {
       try {
         const response = await fetch(item.resultUrl)
         const blob = await response.blob()
@@ -242,7 +385,6 @@ export default function App() {
 
     await Promise.all(promises)
 
-    // Generate and download zip
     const content = await zip.generateAsync({ type: 'blob' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(content)
@@ -254,7 +396,6 @@ export default function App() {
    * handleBatchReset — returns to single image mode
    */
   const handleBatchReset = () => {
-    // Clean up blob URLs
     batchItems.forEach(item => {
       if (item.previewUrl) URL.revokeObjectURL(item.previewUrl)
       if (item.resultUrl) URL.revokeObjectURL(item.resultUrl)
@@ -270,12 +411,10 @@ export default function App() {
     setError(null)
   }
 
-  // Calculate batch progress
   const completedCount = batchItems.filter(item => item.status === 'completed').length
   const allCompleted = completedCount === batchItems.length && batchItems.length > 0
   const progress = batchItems.length > 0 ? (completedCount / batchItems.length) * 100 : 0
 
-  // Get selected batch item
   const selectedItem = batchMode && batchItems.length > 0 ? batchItems[selectedBatchIndex] : null
 
   // ============================================================
@@ -284,7 +423,6 @@ export default function App() {
   if (batchMode) {
     return (
       <div className="min-h-screen flex" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-        {/* Left: Queue Panel */}
         <BatchQueue
           items={batchItems}
           selectedIndex={selectedBatchIndex}
@@ -293,9 +431,7 @@ export default function App() {
           allCompleted={allCompleted}
         />
 
-        {/* Right: Preview Area */}
         <div className="flex-1 flex flex-col">
-          {/* Top bar */}
           <div className="flex items-center justify-between px-8 py-6">
             <div className="flex items-center gap-3 text-white">
               <Scissors size={28} />
@@ -307,9 +443,8 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-3">
-              <UserBadge userId={userId} onSignOut={handleSignOut} />
+              <UserBadge user={user} onSignOut={handleSignOut} />
 
-              {/* Progress badge */}
               <div className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold bg-white/20 text-white">
                 {processingIndex >= 0 ? (
                   <>
@@ -334,7 +469,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Progress bar */}
           {processingIndex >= 0 && (
             <div className="px-8 mb-4">
               <div className="h-2 bg-white/20 rounded-full overflow-hidden">
@@ -346,11 +480,9 @@ export default function App() {
             </div>
           )}
 
-          {/* Preview area */}
           <div className="flex-1 flex items-center justify-center p-6">
             {selectedItem ? (
               <div className="w-full max-w-4xl">
-                {/* Status overlay on image */}
                 <div className="relative rounded-2xl overflow-hidden bg-white/10 border border-white/20">
                   <img
                     src={selectedItem.resultUrl || selectedItem.previewUrl}
@@ -359,7 +491,6 @@ export default function App() {
                     style={{ opacity: selectedItem.status === 'processing' ? 0.5 : 1 }}
                   />
                   
-                  {/* Processing overlay */}
                   {selectedItem.status === 'processing' && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 gap-3">
                       <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin" />
@@ -369,7 +500,6 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* Error overlay */}
                   {selectedItem.status === 'error' && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 gap-3">
                       <AlertCircle size={40} className="text-red-400" />
@@ -379,7 +509,6 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* Success badge */}
                   {selectedItem.status === 'completed' && (
                     <div className="absolute top-4 right-4 px-3 py-1.5 bg-green-500/90 rounded-full text-white text-xs font-semibold flex items-center gap-1.5">
                       <span className="w-2 h-2 bg-white rounded-full" />
@@ -388,7 +517,6 @@ export default function App() {
                   )}
                 </div>
 
-                {/* File info */}
                 <div className="mt-4 text-center">
                   <p className="text-white font-medium">{selectedItem.file.name}</p>
                   <p className="text-white/50 text-sm mt-1">
@@ -405,7 +533,6 @@ export default function App() {
             )}
           </div>
 
-          {/* Bottom action bar */}
           <div className="py-6 px-8 flex items-center justify-between gap-4">
             <div className="text-white/50 text-sm">
               {allCompleted 
@@ -433,7 +560,7 @@ export default function App() {
   }
 
   // ============================================================
-  // SINGLE IMAGE MODE — Original UI
+  // SINGLE IMAGE MODE
   // ============================================================
 
   const handleSingleFileSelect = async (selectedFile) => {
@@ -444,10 +571,10 @@ export default function App() {
     setLoading(true)
 
     try {
-      const blob = await removeBackground(selectedFile)
+      const blob = await callRemoveBackground(selectedFile)
       const url = URL.createObjectURL(blob)
       setResultUrl(url)
-      setUsageCount((c) => c + 1)
+      setUsageCount(c => c + 1)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -465,9 +592,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-      {/* ============================================================
-          STATE 1: Show Result (full-screen Before/After experience)
-      ============================================================ */}
       {resultUrl && !loading ? (
         <Result
           originalUrl={originalUrl}
@@ -475,13 +599,8 @@ export default function App() {
           onReset={handleReset}
         />
       ) : (
-        /* ============================================================
-           STATE 2: Upload / Processing state
-        ============================================================ */
         <>
-          {/* ---- Top bar: logo + free trial badge ---- */}
           <div className="relative z-10 flex items-center justify-between px-8 py-6">
-            {/* Logo */}
             <div className="flex items-center gap-3 text-white">
               <Scissors size={28} />
               <span className="text-xl font-bold tracking-tight hidden sm:inline">
@@ -489,11 +608,9 @@ export default function App() {
               </span>
             </div>
 
-            {/* FREE TRIAL badge + Batch mode toggle */}
             <div className="flex items-center gap-3">
-              <UserBadge userId={userId} onSignOut={handleSignOut} />
+              <UserBadge user={user} onSignOut={handleSignOut} />
 
-              {/* Batch mode button */}
               <button
                 onClick={() => {
                   setBatchMode(true)
@@ -509,7 +626,6 @@ export default function App() {
                 Batch Mode
               </button>
 
-              {/* FREE TRIAL badge */}
               <div className={`
                 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold
                 transition-all duration-300
@@ -530,7 +646,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* ---- Error banner (if any) ---- */}
           {error && (
             <div className="max-w-2xl mx-auto px-6 mb-4 z-20 relative">
               <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-4
@@ -541,10 +656,8 @@ export default function App() {
             </div>
           )}
 
-          {/* ---- Loading overlay — shown while API processes ---- */}
           {loading ? (
             <div className="relative z-10 flex flex-col items-center justify-center min-h-[calc(100vh-100px)] gap-4 sm:gap-6 px-4 sm:px-6">
-              {/* Pulsing preview of selected image */}
               <div className="relative w-48 h-48 sm:w-64 sm:h-64 rounded-2xl overflow-hidden bg-white/10 border border-white/20">
                 {originalUrl && (
                   <img
@@ -553,7 +666,6 @@ export default function App() {
                     className="w-full h-full object-contain opacity-50"
                   />
                 )}
-                {/* Processing overlay */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 gap-2 sm:gap-3">
                   <div className="w-10 h-10 sm:w-12 sm:h-12 border-4 border-white/30 border-t-white rounded-full animate-spin" />
                   <p className="text-white/80 text-xs sm:text-sm font-medium text-center px-2">
@@ -562,7 +674,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* File name */}
               {file && (
                 <p className="text-white/50 text-xs sm:text-sm max-w-xs truncate text-center px-4">
                   {file.name}
@@ -570,7 +681,6 @@ export default function App() {
               )}
             </div>
           ) : (
-            /* ---- Full-screen drop zone ---- */
             <DropZone
               onFileSelect={handleSingleFileSelect}
               onFilesSelect={handleFilesSelect}
@@ -582,7 +692,6 @@ export default function App() {
             />
           )}
 
-          {/* ---- Footer ---- */}
           <footer className="relative z-10 text-center text-white/40 text-xs py-6">
             Made for small e-commerce sellers · 100% Free to Start
           </footer>
