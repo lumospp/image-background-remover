@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { Scissors, AlertCircle, Zap, Layers, ArrowLeft } from 'lucide-react'
+import { useAuth, SignIn } from '@clerk/clerk-react'
+import { Scissors, AlertCircle, Zap, Layers, ArrowLeft, User } from 'lucide-react'
 import DropZone from './components/DropZone'
 import Result from './components/Result'
 import BatchQueue from './components/BatchQueue'
@@ -8,7 +9,62 @@ import JSZip from 'jszip'
 
 const FREE_QUOTA = 50
 
+/**
+ * LoginScreen - Shows Google sign-in button
+ */
+function LoginScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+      <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 text-center">
+        <div className="flex items-center justify-center gap-3 mb-6">
+          <Scissors size={36} className="text-purple-600" />
+          <span className="text-2xl font-bold tracking-tight text-gray-900">BG Remover</span>
+        </div>
+        
+        <h1 className="text-xl font-semibold text-gray-900 mb-2">
+          Welcome back
+        </h1>
+        <p className="text-gray-500 mb-8">
+          Sign in to continue removing backgrounds from your images
+        </p>
+        
+        <SignIn
+          routing="path"
+          path="/sign-in"
+          signUpUrl="/sign-up"
+          afterSignInUrl="/"
+        />
+        
+        <p className="text-xs text-gray-400 mt-6">
+          By signing in, you agree to our Terms of Service and Privacy Policy
+        </p>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * UserButton - Shows when user is signed in
+ */
+function UserBadge({ userId, onSignOut }) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 px-3 py-1.5 bg-white/20 rounded-full text-white text-sm">
+        <User size={14} />
+        <span className="max-w-[100px] truncate">{userId.slice(0, 8)}...</span>
+      </div>
+      <button
+        onClick={onSignOut}
+        className="text-white/60 hover:text-white text-sm transition-colors"
+      >
+        Sign out
+      </button>
+    </div>
+  )
+}
+
 export default function App() {
+  const { isSignedIn, userId, signOut } = useAuth()
   const [file, setFile] = useState(null)
   const [originalUrl, setOriginalUrl] = useState(null)
   const [resultUrl, setResultUrl] = useState(null)
@@ -27,6 +83,19 @@ export default function App() {
 
   // Generate unique ID
   const generateId = () => `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
+  // Handle sign out
+  const handleSignOut = async () => {
+    await signOut()
+    window.location.href = '/'
+  }
+
+  // ============================================================
+  // AUTH GATE — Show login if not signed in
+  // ============================================================
+  if (!isSignedIn) {
+    return <LoginScreen />
+  }
 
   /**
    * handleFileSelect — processes a single image
@@ -238,6 +307,8 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-3">
+              <UserBadge userId={userId} onSignOut={handleSignOut} />
+
               {/* Progress badge */}
               <div className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold bg-white/20 text-white">
                 {processingIndex >= 0 ? (
@@ -365,16 +436,6 @@ export default function App() {
   // SINGLE IMAGE MODE — Original UI
   // ============================================================
 
-  /**
-   * handleFileSelect — processes the selected image:
-   * 1. Shows immediate preview (originalUrl)
-   * 2. Calls Remove.bg API
-   * 3. On success: sets resultUrl, increments usageCount
-   * 4. On error: shows error banner
-   *
-   * NOTE: category is for UI UX only. Remove.bg API currently accepts
-   * only the image file. Category tagging is future enhancement.
-   */
   const handleSingleFileSelect = async (selectedFile) => {
     setFile(selectedFile)
     setOriginalUrl(URL.createObjectURL(selectedFile))
@@ -406,7 +467,6 @@ export default function App() {
     <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
       {/* ============================================================
           STATE 1: Show Result (full-screen Before/After experience)
-          Triggered after successful background removal
       ============================================================ */}
       {resultUrl && !loading ? (
         <Result
@@ -417,7 +477,6 @@ export default function App() {
       ) : (
         /* ============================================================
            STATE 2: Upload / Processing state
-           Full-viewport hero with drag-drop zone
         ============================================================ */
         <>
           {/* ---- Top bar: logo + free trial badge ---- */}
@@ -432,10 +491,11 @@ export default function App() {
 
             {/* FREE TRIAL badge + Batch mode toggle */}
             <div className="flex items-center gap-3">
+              <UserBadge userId={userId} onSignOut={handleSignOut} />
+
               {/* Batch mode button */}
               <button
                 onClick={() => {
-                  // Reset state and switch to batch mode
                   setBatchMode(true)
                   setBatchItems([])
                   setSelectedBatchIndex(0)
@@ -484,7 +544,7 @@ export default function App() {
           {/* ---- Loading overlay — shown while API processes ---- */}
           {loading ? (
             <div className="relative z-10 flex flex-col items-center justify-center min-h-[calc(100vh-100px)] gap-4 sm:gap-6 px-4 sm:px-6">
-              {/* Pulsing preview of selected image — mobile responsive */}
+              {/* Pulsing preview of selected image */}
               <div className="relative w-48 h-48 sm:w-64 sm:h-64 rounded-2xl overflow-hidden bg-white/10 border border-white/20">
                 {originalUrl && (
                   <img
