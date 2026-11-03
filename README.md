@@ -1,82 +1,49 @@
-# Image Background Remover
+# LHY / Cutout — Image Background Remover
 
-使用 AI 一键移除图片背景的网站。
+Production website: https://lyhimageremovebg.shop/
 
-## 技术栈
+A small anonymous image cutout tool using Next.js static export, Cloudflare Pages Functions, D1 for usage budgets, and the remove.bg API.
 
-- **前端**: React + Vite + Tailwind CSS
-- **后端**: Cloudflare Worker (API代理)
-- **AI服务**: Remove.bg API
+## Features
 
-## 部署到 Cloudflare
+- JPG, PNG and WebP uploads, maximum 10 MB.
+- Background-removed PNG generation using remove.bg.
+- Transparent, white, dark and custom color backgrounds for preview and PNG download.
+- No account required. No permanent app image storage.
+- Service-side request budget: 3 attempts per hashed IP per UTC day and 40 global upstream attempts per UTC month.
+- Clear third-party data processing disclosure and a /privacy page.
 
-### 1. 安装依赖
+## Development
 
-```bash
-npm install
-```
+**The active UI is in pages/ and components/, not the legacy Vite src/ folder.** The historical Vite index.html and src/ are not deployed. Do not deploy dist/.
 
-### 2. 配置 API Key
+Install dependencies with `npm ci`, run security regression tests with `npm test`, and build with `npm run build`.
 
-在 `wrangler.toml` 或 Cloudflare Dashboard 中设置 `REMOVE_BG_API_KEY` 环境变量。
+The static export directory is out/. Uploads are handled by Cloudflare Pages Functions under functions/, rather than Next.js API routes. A local Next.js development server alone cannot emulate Cloudflare D1.
 
-### 3. 部署
+## Cloudflare production
 
-```bash
-# 构建前端
-npm run build
+- Project: image-bg-remover-review-2026
+- Git integration: lumospp/image-background-remover, main branch
+- Build command: npm ci && npm test && npm run build
+- Output directory: out
+- Secret: REMOVE_BG_API_KEY in Production (do not commit)
+- D1 binding: DB, using bg-remover-db and the schema in schema.sql
+- Readiness endpoint: GET /api/health; returns 'ready' or 'unavailable' without consuming provider credit
+- Legacy manual Pages project: image-bg-remover, retained for rollback
 
-# 部署到 Cloudflare Pages
-npx wrangler pages deploy dist
-```
+Cloudflare builds production automatically when main changes. Changing a secret or database binding may require a fresh deployment.
 
-### 4. 配置域名（可选）
+## Documentation
 
-在 Cloudflare Dashboard 中绑定自定义域名。
+- docs/PRODUCTION_SECURITY.md — security boundaries, quotas and deployment
+- docs/PRODUCT_GROWTH_EXPERIMENT.md — measuring real demand before monetization
 
-## 本地开发
+The old SOP Vite prototype is retained for historical reference. The working frontend uses Next.js to avoid mixing two incompatible build systems.
 
-```bash
-npm run dev
-```
+## Safety
 
-访问 http://localhost:5173
-
-## 环境变量
-
-| 变量 | 说明 |
-|------|------|
-| `VITE_API_URL` | API地址，默认 `/api` |
-
-## Remove.bg API Key
-
-1. 访问 https://www.remove.bg/api
-2. 注册账号获取免费 API Key（每月50次）
-3. 将 Key 设置到 Cloudflare Worker 环境变量中
-
-## 项目结构
-
-```
-image-bg-remover/
-├── src/
-│   ├── App.jsx          # 主组件
-│   ├── main.jsx         # 入口
-│   ├── index.css        # 全局样式
-│   ├── components/
-│   │   ├── DropZone.jsx # 上传组件
-│   │   └── Result.jsx   # 结果展示
-│   └── lib/
-│       └── api.js       # API调用
-├── functions/
-│   └── [[catchall]].js  # Cloudflare Worker
-├── public/
-├── package.json
-├── vite.config.js
-├── tailwind.config.js
-└── wrangler.toml
-```
-
-## License
-
-MIT
-# Image Background Remover
+- Client validation is an early usability check. The server verifies size, image signature and per-IP/global quotas.
+- Images travel to remove.bg for processing. This site does not store them in D1 or an object store.
+- Never test production by sending large volumes of images.
+- Google login and payments are intentionally not enabled.
