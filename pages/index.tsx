@@ -115,9 +115,10 @@ export default function HomePage() {
   return (
     <>
       <Head>
-        <title>Remove Background from Images | Free AI Tool</title>
-        <meta name="description" content="Remove image backgrounds instantly with AI. Free, fast, and accurate. Perfect for product photos, portraits, and more." />
+        <title>LHY BG Remover | Remove Image Backgrounds Online</title>
+        <meta name="description" content="Remove image backgrounds online with AI. Limited free processing for product photos and portraits. No account required." />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="canonical" href="https://lyhimageremovebg.shop/" />
       </Head>
 
       <div className="min-h-screen bg-white">
@@ -131,11 +132,11 @@ export default function HomePage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
-                <span className="text-lg font-semibold text-gray-900">remove.bg</span>
+                <span className="text-lg font-semibold text-gray-900">LHY BG Remover</span>
               </div>
               <div className="flex items-center gap-4">
                 <span className="px-4 py-1.5 rounded-full text-sm font-medium bg-green-50 text-green-700 border border-green-200">
-                  100% Free
+                  Free Preview
                 </span>
               </div>
             </div>
@@ -409,10 +410,10 @@ export default function HomePage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
-                <span className="text-sm font-medium text-gray-600">remove.bg</span>
+                <span className="text-sm font-medium text-gray-600">LHY BG Remover</span>
               </div>
               <p className="text-sm text-gray-400">
-                Built with AI · No signup required · Completely free forever
+                Built with AI · No signup required · Free usage is limited
               </p>
             </div>
           </div>
