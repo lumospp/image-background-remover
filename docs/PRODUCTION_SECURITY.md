@@ -47,3 +47,7 @@
 - \`npm test\` — unit tests for fail-closed, invalid images, concurrent-style counter contract, per-IP and global budget, and inactive Google login endpoint.
 - \`npm run build\` — static Next.js export into out/.
 - Tests mock the network and D1 and do not prove deployed Cloudflare bindings or the provider API are functioning; a live end-to-end smoke test is still mandatory.
+
+## Deployment verification
+
+The connected Cloudflare Pages validation project is `image-bg-remover-review-2026`. It runs `npm ci && npm test && npm run build` against the security branch before the production site is changed. This project is for build validation, not the public custom domain.
