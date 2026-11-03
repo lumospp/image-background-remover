@@ -1,11 +1,12 @@
 name = "image-bg-remover"
-compatibility_date = "2024-01-01"
-pages_build_output_dir = "./dist"
+compatibility_date = "2026-11-01"
+pages_build_output_dir = "./out"
 
-# REMOVE_BG_API_KEY is set as a secret in Cloudflare Pages Dashboard
+# The existing Cloudflare Pages project uses manual deployments.
+# Build with npm run build, then deploy out/ when CI and security checks pass.
+# REMOVE_BG_API_KEY must remain a Cloudflare production secret, not in Git.
 
-# D1 Database binding (created via: wrangler d1 create bg-remover-db)
 [[d1_databases]]
 binding = "DB"
 database_name = "bg-remover-db"
-database_id = "YOUR_D1_DATABASE_ID_HERE"
+database_id = "99d0824c-ddd9-4a3a-82ff-2f8da8296da8"

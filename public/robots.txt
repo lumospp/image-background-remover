@@ -3,7 +3,7 @@ User-agent: *
 Allow: /
 
 # Sitemap
-Sitemap: https://bgremover.tools/sitemap.xml
+Sitemap: https://lyhimageremovebg.shop/sitemap.xml
 
 # Crawl-delay (optional, be nice to small servers)
 Crawl-delay: 1
