@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type DragEvent } from 'react'
 import Head from 'next/head'
 import dynamic from 'next/dynamic'
 import {
@@ -187,7 +187,7 @@ export default function HomePage() {
   }, [processImage])
 
   const upload = () => fileInputRef.current?.click()
-  const onDrop = (event: React.DragEvent) => {
+  const onDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
     setIsDragging(false)
     const file = event.dataTransfer.files[0]
