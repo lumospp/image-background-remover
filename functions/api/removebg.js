@@ -1,200 +1,172 @@
 /**
- * Cloudflare Worker - Remove.bg API Proxy
- * 改进版: 超时 + 重试 + 文件验证 + D1 用户配额
- * 
- * 环境变量:
- * - REMOVE_BG_API_KEY: Remove.bg API Key (在 Cloudflare Pages Dashboard 设置为 secret)
- * - DB: D1 Database binding (可选，回退到 IP 配额)
+ * Cloudflare Pages Function: public background removal, bounded by D1 quotas.
+ *
+ * All quotas are server-enforced and global across all visitors. No user-supplied
+ * identity, Origin, or X-Forwarded-For header grants additional quota.
+ * The global counter tracks upstream ATTEMPTS, not just successful responses:
+ * this prevents retrying a failing/timeout upstream into an unexpected bill.
  */
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_REQUEST_BYTES = MAX_FILE_BYTES + 128 * 1024;
+const MAX_DAILY_PER_IP = 3;
+const MAX_MONTHLY_UPSTREAM_CALLS = 40;
+const UPSTREAM_TIMEOUT_MS = 25000;
 
-const FREE_DAILY_QUOTA = 50
-
-// 超时 wrapper
-const withTimeout = (promise, ms) =>
-  Promise.race([
-    promise,
-    new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Request timeout (30s)')), ms)
-    ),
-  ])
-
-// 重试 wrapper (指数退避)
-const withRetry = async (fn, retries = 3) => {
-  for (let i = 0; i < retries; i++) {
-    try {
-      return await fn()
-    } catch (err) {
-      if (i === retries - 1) throw err
-      await new Promise((r) => setTimeout(r, 2 ** i * 1000))
-    }
-  }
+function json(message, status, extraHeaders = {}) {
+  return new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+      ...extraHeaders,
+    },
+  });
 }
 
-// 解码 JWT payload
-function decodeJwtPayload(token) {
-  try {
-    const parts = token.split('.')
-    if (parts.length !== 3) return null
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
-    return payload
-  } catch {
-    return null
+function isValidImage(file, bytes) {
+  if (file.type === 'image/png') {
+    return bytes.length >= 8 &&
+      [137, 80, 78, 71, 13, 10, 26, 10].every((v, i) => bytes[i] === v);
   }
+  if (file.type === 'image/jpeg') {
+    return bytes.length >= 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
+  }
+  if (file.type === 'image/webp') {
+    return bytes.length >= 12 &&
+      String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF' &&
+      String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP';
+  }
+  return false;
+}
+
+async function hashedIp(ip, secret) {
+  // Pseudonymous quota key; raw IP addresses are never written to D1.
+  const bytes = new TextEncoder().encode(secret + '\u0000' + ip);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function reserve(db, scope, token, period, limit) {
+  // A single SQLite statement makes each counter reservation atomic, even
+  // under concurrent requests. First insert is also limited to 1 <= limit.
+  const row = await db.prepare(
+    'INSERT INTO usage_counters (scope, token, period, used) VALUES (?, ?, ?, 1) ' +
+    'ON CONFLICT(scope, token, period) DO UPDATE SET used = used + 1 ' +
+    'WHERE used < ? RETURNING used'
+  ).bind(scope, token, period, limit).first();
+  return row !== null;
+}
+
+async function release(db, scope, token, period) {
+  await db.prepare(
+    'UPDATE usage_counters SET used = used - 1 ' +
+    'WHERE scope = ? AND token = ? AND period = ? AND used > 0'
+  ).bind(scope, token, period).run();
 }
 
 export async function onRequest({ request, env }) {
-  // 只允许 POST
   if (request.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return json('Method not allowed', 405, { Allow: 'POST' });
   }
 
-  // --- 安全检查: API Key ---
-  const apiKey = env.REMOVE_BG_API_KEY
-  if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'API not configured' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    })
+  // Fail closed when a security-critical binding is missing.
+  if (!env?.REMOVE_BG_API_KEY || !env?.DB) {
+    return json('Image processing is temporarily unavailable', 503);
   }
 
-  // --- 获取用户 ID (从 Authorization header) ---
-  const authHeader = request.headers.get('Authorization') || ''
-  let userId = null
-  let userUsageCount = 0
-
-  if (authHeader.startsWith('Bearer ')) {
-    const token = authHeader.slice(7)
-    const payload = decodeJwtPayload(token)
-    if (payload && payload.sub) {
-      userId = payload.sub
+  const contentLength = request.headers.get('content-length');
+  if (contentLength !== null) {
+    const length = Number(contentLength);
+    if (!Number.isSafeInteger(length) || length < 0 || length > MAX_REQUEST_BYTES) {
+      return json('Request too large (max image size 10 MB)', 413);
     }
   }
 
-  // --- 文件大小限制 (10MB) ---
-  const contentLength = parseInt(request.headers.get('content-length') || '0')
-  if (contentLength > 10 * 1024 * 1024) {
-    return new Response(JSON.stringify({ error: 'File too large (max 10MB)' }), {
-      status: 413,
-      headers: { 'Content-Type': 'application/json' },
-    })
+  // Never trust arbitrary user-controlled X-Forwarded-For headers for quota.
+  const ip = request.headers.get('CF-Connecting-IP');
+  if (!ip || ip.length > 64) {
+    return json('Unable to verify the request source', 403);
   }
 
-  // --- 配额检查 (D1 或 IP) ---
-  if (env.DB && userId) {
-    // D1 用户配额检查
-    const user = await env.DB
-      .prepare('SELECT usage_count FROM users WHERE google_id = ?')
-      .bind(userId)
-      .first()
-
-    if (user) {
-      userUsageCount = user.usage_count || 0
-      if (userUsageCount >= FREE_DAILY_QUOTA) {
-        return new Response(
-          JSON.stringify({ error: `Daily quota exceeded. Limit: ${FREE_DAILY_QUOTA}/day. Please try again tomorrow.` }),
-          { status: 429, headers: { 'Content-Type': 'application/json' } }
-        )
-      }
-    }
-  } else {
-    // 回退到 IP 配额 (Cloudflare KV)
-    const kv = env.QUOTA_KV
-    if (kv) {
-      const ip = request.headers.get('CF-Connecting-IP') || 'anonymous'
-      const today = new Date().toISOString().slice(0, 10)
-      const quotaKey = `quota:${ip}:${today}`
-      const used = parseInt((await kv.get(quotaKey)) || '0')
-      if (used >= FREE_DAILY_QUOTA) {
-        return new Response(
-          JSON.stringify({ error: `Daily quota exceeded. Limit: ${FREE_DAILY_QUOTA}/day` }),
-          { status: 429, headers: { 'Content-Type': 'application/json' } }
-        )
-      }
-    }
-  }
-
-  // --- 解析请求体 ---
-  let imageFile
+  let image;
   try {
-    const formData = await request.formData()
-    imageFile = formData.get('image')
+    const form = await request.formData();
+    image = form.get('image');
   } catch {
-    return new Response(JSON.stringify({ error: 'Invalid form data' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return json('Invalid image upload', 400);
   }
 
-  if (!imageFile) {
-    return new Response(JSON.stringify({ error: 'No image provided' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    })
+  if (!image || typeof image.size !== 'number' || typeof image.slice !== 'function' ||
+      image.size === 0 || image.size > MAX_FILE_BYTES) {
+    return json('An image of up to 10 MB is required', 400);
   }
 
-  // --- 类型验证 ---
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
-  if (!allowedTypes.includes(imageFile.type)) {
-    return new Response(
-      JSON.stringify({ error: 'Invalid file type. Use JPEG, PNG, or WebP' }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
-    )
+  const signature = new Uint8Array(await image.slice(0, 12).arrayBuffer());
+  if (!isValidImage(image, signature)) {
+    return json('Unsupported or invalid image (JPEG, PNG, WebP only)', 415);
   }
 
-  // --- 构建 Remove.bg 请求 ---
-  const removeBgFormData = new FormData()
-  removeBgFormData.append('image_file', imageFile)
-  removeBgFormData.append('size', 'regular')
-
-  // --- 调用 Remove.bg ---
-  let removeBgResponse
+  const now = new Date().toISOString();
+  const day = now.slice(0, 10);
+  const month = now.slice(0, 7);
+  let ipKey;
+  let ipReserved = false;
   try {
-    removeBgResponse = await withRetry(() =>
-      withTimeout(
-        fetch('https://api.remove.bg/v1.0/removebg', {
-          method: 'POST',
-          headers: { 'X-Api-Key': apiKey },
-          body: removeBgFormData,
-        }),
-        30000
-      )
-    )
-  } catch (err) {
-    return new Response(JSON.stringify({ error: `API call failed: ${err.message}` }), {
-      status: 502,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    ipKey = await hashedIp(ip, env.REMOVE_BG_API_KEY);
+    ipReserved = await reserve(env.DB, 'ip', ipKey, day, MAX_DAILY_PER_IP);
+    if (!ipReserved) {
+      return json('Free daily limit reached. Please try again tomorrow (UTC).', 429);
+    }
+
+    const globalReserved = await reserve(
+      env.DB, 'global', 'all', month, MAX_MONTHLY_UPSTREAM_CALLS
+    );
+    if (!globalReserved) {
+      // No upstream attempt was made, so give this visitor their slot back.
+      await release(env.DB, 'ip', ipKey, day);
+      return json('Free processing capacity is exhausted this month.', 429);
+    }
+  } catch {
+    if (ipReserved) {
+      try { await release(env.DB, 'ip', ipKey, day); } catch {}
+    }
+    return json('Image processing is temporarily unavailable', 503);
   }
 
-  if (!removeBgResponse.ok) {
-    const errorText = await removeBgResponse.text()
-    return new Response(
-      JSON.stringify({ error: `Remove.bg API error: ${errorText}` }),
-      { status: removeBgResponse.status, headers: { 'Content-Type': 'application/json' } }
-    )
-  }
+  // At this point both quotas are reserved. Deliberately DO NOT refund them
+  // after a network error: the upstream may have charged for the attempt.
+  const form = new FormData();
+  form.append('image_file', image);
+  form.append('size', 'regular');
 
-  // --- 配额扣减 ---
-  if (env.DB && userId) {
-    await env.DB
-      .prepare('UPDATE users SET usage_count = usage_count + 1 WHERE google_id = ?')
-      .bind(userId)
-      .run()
-  } else if (env.QUOTA_KV) {
-    const kv = env.QUOTA_KV
-    const ip = request.headers.get('CF-Connecting-IP') || 'anonymous'
-    const today = new Date().toISOString().slice(0, 10)
-    const quotaKey = `quota:${ip}:${today}`
-    const used = parseInt((await kv.get(quotaKey)) || '0')
-    await kv.put(quotaKey, String(used + 1), { expirationTtl: 86400 })
+  const abort = new AbortController();
+  const timeout = setTimeout(() => abort.abort(), UPSTREAM_TIMEOUT_MS);
+  try {
+    const response = await fetch('https://api.remove.bg/v1.0/removebg', {
+      method: 'POST',
+      headers: { 'X-Api-Key': env.REMOVE_BG_API_KEY },
+      body: form,
+      signal: abort.signal,
+    });
+    if (!response.ok || !response.body) {
+      return json('Background removal failed. Please try later.', 502);
+    }
+    const type = (response.headers.get('content-type') || '').toLowerCase();
+    if (!type.startsWith('image/png')) {
+      return json('Image service returned an unexpected response', 502);
+    }
+    return new Response(response.body, {
+      status: 200,
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    });
+  } catch {
+    return json('Background removal timed out or failed', 502);
+  } finally {
+    clearTimeout(timeout);
   }
-
-  const blob = await removeBgResponse.blob()
-  return new Response(blob, {
-    status: 200,
-    headers: { 'Content-Type': 'image/png' },
-  })
 }
