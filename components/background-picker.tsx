@@ -1,20 +1,8 @@
 'use client'
 
-import { cn } from '@/lib/utils'
 import { Check } from 'lucide-react'
 
 type BgType = 'transparent' | 'white' | 'black' | 'custom'
-
-const PRESET_COLORS = [
-  { name: 'Transparent', value: 'transparent', pattern: 'checkerboard' },
-  { name: 'White', value: 'white', bg: 'bg-white' },
-  { name: 'Black', value: 'black', bg: 'bg-black' },
-  { name: 'Red', value: 'custom', color: '#ef4444' },
-  { name: 'Blue', value: 'custom', color: '#3b82f6' },
-  { name: 'Green', value: 'custom', color: '#22c55e' },
-  { name: 'Yellow', value: 'custom', color: '#eab308' },
-  { name: 'Purple', value: 'custom', color: '#a855f7' },
-]
 
 interface BackgroundPickerProps {
   value: BgType
@@ -23,91 +11,56 @@ interface BackgroundPickerProps {
   onCustomColorChange: (color: string) => void
 }
 
-export function BackgroundPicker({
-  value,
-  customColor,
-  onChange,
-  onCustomColorChange,
-}: BackgroundPickerProps) {
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap gap-2">
-        {PRESET_COLORS.map((preset) => (
-          <button
-            key={preset.name}
-            onClick={() => {
-              onChange(preset.value as BgType)
-              if (preset.value === 'custom' && preset.color) {
-                onCustomColorChange(preset.color)
-              }
-            }}
-            className={cn(
-              'relative w-8 h-8 rounded-lg border-2 border-gray-200 transition-all hover:scale-110',
-              preset.pattern === 'checkerboard' && 'checkerboard',
-              preset.bg,
-              value === preset.value && preset.value !== 'custom' && 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-white'
-            )}
-            style={
-              preset.color
-                ? { backgroundColor: preset.color }
-                : undefined
-            }
-            title={preset.name}
-          >
-            {value === preset.value && (
-              <Check
-                size={14}
-                className={cn(
-                  'absolute inset-0 m-auto',
-                  preset.value === 'black' || preset.color === '#3b82f6' || preset.color === '#22c55e'
-                    ? 'text-white'
-                    : 'text-black'
-                )}
-              />
-            )}
-          </button>
-        ))}
+const options: Array<{ name: string; kind: BgType; color?: string }> = [
+  { name: 'Transparent', kind: 'transparent' },
+  { name: 'White', kind: 'white' },
+  { name: 'Dark', kind: 'black' },
+  { name: 'Warm sand', kind: 'custom', color: '#f3d5aa' },
+  { name: 'Soft green', kind: 'custom', color: '#dfeee4' },
+  { name: 'Cool gray', kind: 'custom', color: '#e5e9ed' },
+]
 
-        {/* Custom color picker */}
-        <div className="relative">
+export function BackgroundPicker({ value, customColor = '#dfeee4', onChange, onCustomColorChange }: BackgroundPickerProps) {
+  return (
+    <div>
+      <p className="mb-3 text-xs font-semibold text-[#557462]">Preview background</p>
+      <div role="group" aria-label="Choose a preview background" className="flex flex-wrap items-center gap-2.5">
+        {options.map(option => {
+          const selected = option.kind === 'custom'
+            ? value === 'custom' && customColor.toLowerCase() === option.color
+            : value === option.kind
+          return (
+            <button
+              type="button"
+              key={option.name}
+              title={option.name}
+              aria-label={option.name}
+              aria-pressed={selected}
+              onClick={() => {
+                onChange(option.kind)
+                if (option.color) onCustomColorChange(option.color)
+              }}
+              className={'relative flex h-10 w-10 items-center justify-center rounded-xl border-2 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#247b57] ' + (selected ? 'border-[#2f805c] ring-2 ring-[#d9eddf]' : 'border-[#e0e7e1] hover:border-[#80a48a]') + (option.kind === 'transparent' ? ' checkerboard' : '')}
+              style={option.kind === 'white' ? { backgroundColor: '#fff' } : option.kind === 'black' ? { backgroundColor: '#25372b' } : option.color ? { backgroundColor: option.color } : undefined}
+            >
+              {selected && <Check size={17} strokeWidth={3} aria-hidden="true" className={option.kind === 'black' ? 'text-white' : 'text-[#20573c]'} />}
+            </button>
+          )
+        })}
+        <label title="Custom color" className={'relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border-2 bg-white p-1 ' + (value === 'custom' && !options.some(option => option.color?.toLowerCase() === customColor.toLowerCase()) ? 'border-[#2f805c] ring-2 ring-[#d9eddf]' : 'border-[#e0e7e1]')}>
+          <span className="sr-only">Choose a custom background color</span>
           <input
             type="color"
-            value={customColor || '#3b82f6'}
-            onChange={(e) => {
+            aria-label="Custom background color"
+            value={/^#[0-9a-fA-F]{6}$/.test(customColor) ? customColor : '#dfeee4'}
+            onChange={event => {
               onChange('custom')
-              onCustomColorChange(e.target.value)
+              onCustomColorChange(event.target.value)
             }}
-            className="w-8 h-8 rounded-lg border-2 border-gray-200 cursor-pointer p-0 bg-transparent"
-            title="Custom color"
+            className="h-7 w-7 cursor-pointer rounded-lg border-0 bg-transparent p-0"
           />
-          {value === 'custom' && (
-            <div
-              className="absolute inset-0 rounded-lg ring-2 ring-indigo-500 ring-offset-2 ring-offset-white pointer-events-none"
-              style={{ backgroundColor: 'transparent' }}
-            />
-          )}
-        </div>
+        </label>
       </div>
-
-      {value === 'custom' && (
-        <div className="flex items-center gap-2">
-          <span className="text-gray-500 text-xs">Custom color:</span>
-          <input
-            type="text"
-            value={customColor}
-            onChange={(e) => {
-              onChange('custom')
-              onCustomColorChange(e.target.value)
-            }}
-            className="bg-gray-50 border border-gray-200 rounded px-2 py-1 text-gray-700 text-xs w-24 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            placeholder="#000000"
-          />
-          <div
-            className="w-6 h-6 rounded border border-gray-200"
-            style={{ backgroundColor: customColor }}
-          />
-        </div>
-      )}
     </div>
   )
 }

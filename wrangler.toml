@@ -1,10 +1,10 @@
-name = "image-bg-remover"
+name = "image-bg-remover-review-2026"
 compatibility_date = "2026-11-01"
 pages_build_output_dir = "./out"
 
-# The existing Cloudflare Pages project uses manual deployments.
-# Build with npm run build, then deploy out/ when CI and security checks pass.
-# REMOVE_BG_API_KEY must remain a Cloudflare production secret, not in Git.
+# GitHub main auto-deploys to the existing Cloudflare Pages project.
+# IMPORTANT: REMOVE_BG_API_KEY is a production secret configured in Cloudflare.
+# Always run npm test / npm run build before merging to main.
 
 [[d1_databases]]
 binding = "DB"
