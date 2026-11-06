@@ -34,8 +34,8 @@ export default function PrivacyPage() {
               <p className="mt-3">Cloudflare may independently process technical request logs and security information as part of operating the site.</p>
             </section>
             <section>
-              <h2 className="text-xl font-semibold text-[#193b30]">Accounts, payments and cookies</h2>
-              <p className="mt-3">The current tool does not require an account, does not process payments and does not intentionally set tracking cookies. Essential provider-level security or analytics processing may still apply.</p>
+              <h2 className="text-xl font-semibold text-[#193b30]">Google accounts, test payments and cookies</h2>
+              <p className="mt-3">The background remover remains usable without an account. If you choose Google sign-in, we store your verified Google account ID, name and email in Cloudflare D1 and use a Secure, HttpOnly session cookie. The optional Stripe integration operates in Test Mode only, recording test checkout identifiers and demo-credit balances. It does not accept live payments. The demo credits do not enable extra image processing. Essential provider-level security or analytics processing may also apply.</p>
             </section>
             <section>
               <h2 className="text-xl font-semibold text-[#193b30]">Retention and contact</h2>

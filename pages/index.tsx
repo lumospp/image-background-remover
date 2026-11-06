@@ -7,6 +7,8 @@ import {
   UploadCloud, XCircle,
 } from 'lucide-react'
 
+const AccountPanel = dynamic(() => import('@/components/account-panel'), { ssr: false })
+
 const ResultView = dynamic(
   () => import('@/components/result-view').then(module => module.ResultView),
   { ssr: false, loading: () => <p className="p-8 text-center text-sm text-stone-500">Preparing your image…</p> }
@@ -211,7 +213,7 @@ export default function HomePage() {
 
       <div className="min-h-screen bg-[#f8faf6] text-[#193b30] selection:bg-[#c2edcf]">
         <header className="relative z-20 border-b border-[#dce7df] bg-[#f8faf6]/95 backdrop-blur">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 py-4 sm:px-8">
             <a href="/" className="flex items-center gap-3 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#176f51]" aria-label="LHY BG Remover home">
               <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#194b3a] text-white shadow-[0_5px_12px_rgba(25,75,58,.12)]">
                 <Layers3 aria-hidden="true" size={23} strokeWidth={1.9} />
@@ -226,6 +228,7 @@ export default function HomePage() {
               <a href="#use-cases" className="transition hover:text-[#194b3a]">Use cases</a>
               <a href="#faq" className="transition hover:text-[#194b3a]">FAQ</a>
             </nav>
+            <AccountPanel />
             <a href="#upload" className="inline-flex items-center gap-2 rounded-full bg-[#194b3a] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#28674e] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#176f51]">
               Try it free <ArrowUpRight size={16} aria-hidden="true" />
             </a>
