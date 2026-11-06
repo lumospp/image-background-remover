@@ -17,6 +17,7 @@ function mockDb() {
     async run(){
       if(sql.startsWith('INSERT INTO auth_users'))users.set(args[0],{id:args[0],email:args[1],name:args[2]});
       else if(sql.startsWith('INSERT INTO auth_sessions'))sessions.set(args[0],{userId:args[1],expires:args[3]});
+      else if(sql.startsWith('INSERT INTO sandbox_checkout_orders')) {orders.set(args[0],{user_id:args[1],credits:args[3],status:args[4]});}
       else if(sql.startsWith('INSERT OR IGNORE INTO sandbox_credit_ledger')){if(![...ledger.values()].some(x=>x.ref===args[3]))ledger.set(args[0],{userId:args[1],delta:args[2],ref:args[3]});}
       else if(sql.startsWith('UPDATE sandbox_checkout_orders')){const o=orders.get(args[1]);if(o)o.status='paid';}
       else if(sql.startsWith('INSERT OR IGNORE INTO sandbox_webhook_events')){}
@@ -121,4 +122,23 @@ test('unpaid, nonexistent or live Stripe orders never receive credits',async()=>
   e.livemode=true;
   assert.equal((await webhook({request:await signEvent(e),env})).status,400);
   assert.equal(db.ledger.size,0);
+});
+
+test('authenticated checkout selects server price and records a Stripe TEST order',async()=>{
+  const db=mockDb();
+  const token=await createUserSession(db,{id:'123456789012345678901',email:'test@example.com',name:'Test User'});
+  const request=new Request(origin+'/api/billing/checkout',{method:'POST',headers:{Origin:origin,Cookie:'__Host-lhy_session='+token}});
+  const env={DB:db,STRIPE_TEST_SECRET_KEY:'sk_test_fake',STRIPE_TEST_PRICE_ID:'price_test_example',STRIPE_TEST_WEBHOOK_SECRET:KEY};
+  await withFetch(async(url,options)=>{
+    assert.equal(url,'https://api.stripe.com/v1/checkout/sessions');
+    assert.equal(options.body.get('line_items[0][price]'),'price_test_example');
+    assert.equal(options.body.get('metadata[practice_only]'),'true');
+    return Response.json({id:'cs_test_new',url:'https://checkout.stripe.com/c/pay/cs_test_new'});
+  },async()=>{
+    const r=await checkout({request,env});
+    assert.equal(r.status,200);
+    assert.equal((await r.json()).sandboxOnly,true);
+    assert.equal(db.orders.get('cs_test_new').credits,5);
+    assert.equal(db.orders.get('cs_test_new').status,'pending');
+  });
 });
