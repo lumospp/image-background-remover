@@ -38,6 +38,7 @@ Cloudflare builds production automatically when main changes. Changing a secret 
 
 - docs/PRODUCTION_SECURITY.md — security boundaries, quotas and deployment
 - docs/PRODUCT_GROWTH_EXPERIMENT.md — measuring real demand before monetization
+- docs/GOOGLE_STRIPE_SANDBOX.md — Google login, Stripe Test Mode checkout, secure webhook and D1 migration instructions
 
 The old SOP Vite prototype remains in Git history, not the deployable working tree. The working frontend uses Next.js to avoid mixing two incompatible build systems.
 
@@ -46,7 +47,7 @@ The old SOP Vite prototype remains in Git history, not the deployable working tr
 - Client validation is an early usability check. The server verifies size, image signature and per-IP/global quotas.
 - Images travel to remove.bg for processing. This site does not store them in D1 or an object store.
 - Never test production by sending large volumes of images.
-- Google login and payments are intentionally not enabled.
+- Optional Google login and Stripe TEST-only Checkout modules are available behind Cloudflare runtime settings. No live payments are enabled. See docs/GOOGLE_STRIPE_SANDBOX.md.
 
 
 ## Security maintenance (November 2026)
@@ -56,3 +57,8 @@ The old SOP Vite prototype remains in Git history, not the deployable working tr
 - The image API only requests preview-resolution PNGs to stay within the remove.bg free tier.
 - Cross-site browser form uploads are rejected; anonymous D1 quotas and the 40-call global monthly cap remain mandatory.
 - Validate with `npm ci && npm test && npm run typecheck && npm run build`.
+
+
+## Optional account + test checkout exercise
+
+Anonymous upload remains the default. Google sign-in appears only after configuring GOOGLE_CLIENT_ID. Stripe Checkout uses only sk_test_ keys and records **nonredeemable demonstration credits**; it never accepts live payments. Apply migrations/0002_auth_stripe_sandbox.sql before activating Google sign-in. See docs/GOOGLE_STRIPE_SANDBOX.md for the operator steps.
