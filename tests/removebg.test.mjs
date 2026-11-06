@@ -143,3 +143,44 @@ test('legacy Google JWT endpoint is disabled, not decoded', async () => {
   const r = await authRequest({ request: new Request('https://example.test/api/auth', { method: 'POST' }) });
   assert.equal(r.status, 503);
 });
+
+
+test('rejects cross-origin browser uploads without spending capacity', async () => {
+  let calls = 0;
+  await withFetch(async () => { calls++; return success(); }, async () => {
+    const request = upload();
+    request.headers.set('Origin', 'https://malicious.example');
+    const blocked = await onRequest({ request, env: env() });
+    assert.equal(blocked.status, 403);
+    assert.equal(calls, 0);
+  });
+});
+
+test('rejects cross-site Fetch Metadata requests', async () => {
+  const request = upload();
+  request.headers.set('Sec-Fetch-Site', 'cross-site');
+  const blocked = await onRequest({ request, env: env() });
+  assert.equal(blocked.status, 403);
+});
+
+test('sends preview-resolution PNG requests to remove.bg', async () => {
+  let checked = false;
+  await withFetch(async (_url, options) => {
+    assert.equal(options.body.get('size'), 'preview');
+    assert.equal(options.body.get('format'), 'png');
+    checked = true;
+    return success();
+  }, async () => {
+    const response = await onRequest({ request: upload(), env: env() });
+    assert.equal(response.status, 200);
+  });
+  assert.equal(checked, true);
+});
+
+test('provider credit exhaustion is handled without exposing provider response', async () => {
+  await withFetch(async () => new Response('private upstream details', { status: 402 }), async () => {
+    const r = await onRequest({ request: upload(), env: env() });
+    assert.equal(r.status, 503);
+    assert.doesNotMatch(await r.text(), /private upstream details/);
+  });
+});

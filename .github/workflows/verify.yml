@@ -1,8 +1,7 @@
 name: Security and Build Checks
-
 on:
   push:
-    branches: [main, "security/**"]
+    branches: [main, "security/**", "chore/**"]
   pull_request:
 
 permissions:
@@ -11,7 +10,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,4 +19,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - run: npm run typecheck
       - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high

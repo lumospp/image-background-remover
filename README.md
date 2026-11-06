@@ -15,7 +15,7 @@ A small anonymous image cutout tool using Next.js static export, Cloudflare Page
 
 ## Development
 
-**The active UI is in pages/ and components/, not the legacy Vite src/ folder.** The historical Vite index.html and src/ are not deployed. Do not deploy dist/.
+**The active UI is in pages/ and components/, not the legacy Vite src/ folder.** The historical Vite prototype was removed from the working tree, but remains available in Git history. Only Next.js pages/ is deployed.
 
 Install dependencies with `npm ci`, run security regression tests with `npm test`, and build with `npm run build`.
 
@@ -39,7 +39,7 @@ Cloudflare builds production automatically when main changes. Changing a secret 
 - docs/PRODUCTION_SECURITY.md — security boundaries, quotas and deployment
 - docs/PRODUCT_GROWTH_EXPERIMENT.md — measuring real demand before monetization
 
-The old SOP Vite prototype is retained for historical reference. The working frontend uses Next.js to avoid mixing two incompatible build systems.
+The old SOP Vite prototype remains in Git history, not the deployable working tree. The working frontend uses Next.js to avoid mixing two incompatible build systems.
 
 ## Safety
 
@@ -47,3 +47,12 @@ The old SOP Vite prototype is retained for historical reference. The working fro
 - Images travel to remove.bg for processing. This site does not store them in D1 or an object store.
 - Never test production by sending large volumes of images.
 - Google login and payments are intentionally not enabled.
+
+
+## Security maintenance (November 2026)
+
+- Next.js upgraded to a supported stable 16.x release.
+- Deprecated Vite frontend, stale Clerk/Radix UI components and prebuilt dist/ were removed from the working tree; use Git history for reference.
+- The image API only requests preview-resolution PNGs to stay within the remove.bg free tier.
+- Cross-site browser form uploads are rejected; anonymous D1 quotas and the 40-call global monthly cap remain mandatory.
+- Validate with `npm ci && npm test && npm run typecheck && npm run build`.

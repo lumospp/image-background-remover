@@ -55,7 +55,7 @@ async function reserve(db, scope, token, period, limit) {
     'ON CONFLICT(scope, token, period) DO UPDATE SET used = used + 1 ' +
     'WHERE used < ? RETURNING used'
   ).bind(scope, token, period, limit).first();
-  return row !== null;
+  return !!row;
 }
 
 async function release(db, scope, token, period) {
@@ -84,6 +84,15 @@ export async function onRequest({ request, env }) {
   }
 
   // Never trust arbitrary user-controlled X-Forwarded-For headers for quota.
+  const requestedOrigin = request.headers.get('Origin');
+  const requestOrigin = new URL(request.url).origin;
+  if (requestedOrigin && requestedOrigin !== requestOrigin) {
+    return json('Cross-site uploads are not allowed', 403);
+  }
+  if (request.headers.get('Sec-Fetch-Site') === 'cross-site') {
+    return json('Cross-site uploads are not allowed', 403);
+  }
+
   const ip = request.headers.get('CF-Connecting-IP');
   if (!ip || ip.length > 64) {
     return json('Unable to verify the request source', 403);
@@ -138,7 +147,8 @@ export async function onRequest({ request, env }) {
   // after a network error: the upstream may have charged for the attempt.
   const form = new FormData();
   form.append('image_file', image);
-  form.append('size', 'regular');
+  form.append('size', 'preview'); // The free low-resolution API tier.
+  form.append('format', 'png');
 
   const abort = new AbortController();
   const timeout = setTimeout(() => abort.abort(), UPSTREAM_TIMEOUT_MS);
@@ -149,6 +159,12 @@ export async function onRequest({ request, env }) {
       body: form,
       signal: abort.signal,
     });
+    if (response.status === 402 || response.status === 403) {
+      return json('The processing service has no available free capacity. Please try later.', 503);
+    }
+    if (response.status === 429) {
+      return json('The processing service is busy. Please try again later.', 503);
+    }
     if (!response.ok || !response.body) {
       return json('Background removal failed. Please try later.', 502);
     }
