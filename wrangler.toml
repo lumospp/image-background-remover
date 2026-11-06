@@ -10,7 +10,3 @@ pages_build_output_dir = "./out"
 binding = "DB"
 database_name = "bg-remover-db"
 database_id = "99d0824c-ddd9-4a3a-82ff-2f8da8296da8"
-
-# Temporary: dependency lock regeneration in isolated build project.
-[vars]
-SKIP_DEPENDENCY_INSTALL = "1"

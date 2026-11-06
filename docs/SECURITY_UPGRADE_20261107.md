@@ -16,3 +16,11 @@
 - remove.bg currently supplies 50 free low-resolution API calls per month, not unlimited high-resolution processing.
 - Existing global allowance remains capped at 40 upstream attempts/month for safety.
 - Current user-facing design has already been refreshed; this maintenance PR is intentionally not a redesign.
+
+## Verified in the isolated Cloudflare Pages build
+
+- Next.js 16.4.5, React 18.3.x, Node 22.
+- 12 regression tests pass; TypeScript typecheck and static export pass.
+- npm audit --omit=dev --audit-level=high reports **0 vulnerabilities** after dependency lock refresh.
+- package-lock.json contains 142 package entries, is regenerated from the official npm registry and does not reference third-party mirrors.
+- Temporary lockfile emission script and build overrides are removed before production merge.
